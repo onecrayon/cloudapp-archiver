@@ -68,15 +68,26 @@ while response is not None and response.status_code == requests.codes.ok:
 		# Secondary request to download the file itself
 		if item["remote_url"] is not None:
 			r = requests.get(item["remote_url"], stream=True)
-			filePath = os.path.join(folderPath, item["name"])
+			name = item["name"]
+			# Make sure the name doesn't include colons or slashes
+			name = name.replace(':', '-')
+			name = name.replace('/', '-')
+			name = name.replace('\\', '-')
+			filePath = os.path.join(folderPath, name)
+			# Ensure we have a file extension
+			ext = os.path.splitext(filePath)[-1]
+			if ext is "":
+				ext = os.path.splitext(item["remote_url"])[-1]
+				if ext is not "":
+					filePath += ext
 			if r.status_code == requests.codes.ok:
-				print("Downloading to " + os.path.join(localFolder, item["name"]) + ' ...')
+				print("Downloading " + os.path.join(localFolder, name) + ' ...')
 				with open(filePath, 'wb') as f:
 					for chunk in r.iter_content(1024):
 						f.write(chunk)
 			else:
 				# Failed to download for some reason, so delete the folder so we can try again in the future
-				print("Error: failed to download " + os.path.join(localFolder, item["name"]))
+				print("Error: failed to download " + os.path.join(localFolder, name))
 				os.rmdir(folderPath)
 		elif item["redirect_url"] is not None:
 			# We have a URL; create an IE-style .url file (which also works in Safari)
@@ -89,7 +100,7 @@ while response is not None and response.status_code == requests.codes.ok:
 			print("Error: failed to process item: " + json.dumps(item))
 			os.rmdir(folderPath)
 	# Now that we've downloaded all the files, check for our next URL
-	if json["links"] is not None and json["link"]["next_url"] is not None:
+	if "links" in json and "next_url" in json["links"]:
 		url = json["links"]["next_url"]["href"]
 		response = requests.get(url, auth=HTTPDigestAuth(username, password), headers={'Accept': 'application/json'})
 	else:
